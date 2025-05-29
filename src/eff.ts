@@ -11,7 +11,9 @@ export function eff<T extends string, P = void>(
 }
 
 // Handler型の定義
-export type Handler<E extends Eff<any, any>, R> = (effect: E) => Promise<R> | R;
+export type Handler<E extends Eff<any, any>, R> = (
+  payload: E["payload"]
+) => Promise<R> | R;
 
 // Handlers型を推論するためのヘルパー型
 export type InferHandlers<TEffect extends Eff<any, any>> = {
@@ -61,7 +63,7 @@ export async function runEff<TEffect extends Eff<any, any>, TResult>(
     }
 
     // Handlerを実行して結果を取得
-    const handlerResult = await handler(effect);
+    const handlerResult = await handler(effect.payload);
 
     // 結果をgeneratorに送り返す
     if (isAsync) {

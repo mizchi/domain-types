@@ -69,12 +69,12 @@ Deno.test("Eff Example", async () => {
 
   // 型推論可能なハンドラーの作成
   const handlers = createHandlers<ProgramEffect>({
-    async console(effect) {
-      console.log(`[CONSOLE] ${effect.payload}`);
-      return effect.payload; // コンソール出力の結果を返す
+    async console(payload) {
+      console.log(`[CONSOLE] ${payload}`);
+      return payload; // コンソール出力の結果を返す
     },
-    async fsRead(effect) {
-      const { path } = effect.payload;
+    async fsRead(payload) {
+      const { path } = payload;
       console.log(`[FILE READ] ${path}`);
 
       // ファイル読み込みをシミュレート
@@ -89,22 +89,22 @@ Deno.test("Eff Example", async () => {
         2
       );
     },
-    fsWrite: async (effect) => {
-      const { path, content } = effect.payload;
+    fsWrite: async (payload) => {
+      const { path, content } = payload;
       // ファイル書き込みをシミュレート
       await new Promise((resolve) => setTimeout(resolve, 300));
       console.log(`[FILE WRITE] ${path}: ${content}`);
       return undefined;
     },
 
-    timer: async (effect) => {
-      console.log(`[TIMER] Waiting ${effect.payload}ms...`);
-      await new Promise((resolve) => setTimeout(resolve, effect.payload));
+    timer: async (payload) => {
+      console.log(`[TIMER] Waiting ${payload}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, payload));
       console.log(`[TIMER] Wait completed`);
     },
 
-    database: async (effect) => {
-      const { query, params } = effect.payload;
+    database: async (payload) => {
+      const { query, params } = payload;
       console.log(`[DB] Executing: ${query}`, params);
       await new Promise((resolve) => setTimeout(resolve, 800));
       // モックデータを返す
