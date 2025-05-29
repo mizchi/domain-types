@@ -1,0 +1,15 @@
+{
+  "name": "@mizchi/domain-types",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "Domain types for Deno",
+  "tasks": {
+    "dev": "deno run --watch main.ts"
+  },
+  "exports": {
+    ".": "./src/mod.ts"
+  },
+  "imports": {
+    "@std/expect": "jsr:@std/expect@^1.0.16"
+  }
+}
