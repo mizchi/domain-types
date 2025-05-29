@@ -7,7 +7,13 @@ typescript utilities for domain modeling
 Simple result types with asserts
 
 ```ts
-import { ok, err, assertErr, assertOk, type Result } from "../src/mod.ts";
+import {
+  ok,
+  err,
+  assertErr,
+  assertOk,
+  type Result,
+} from "@mizchi/domain-types";
 
 function getValue(v: number): Result<string, string> {
   if (v > 0) {
