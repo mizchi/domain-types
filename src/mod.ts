@@ -3,6 +3,8 @@ export {
   eff,
   createHandlers,
   waitFor,
+  waitForAsync,
+  waitForSync,
   type Eff,
   type InferHandlers,
 } from "./eff.ts";
