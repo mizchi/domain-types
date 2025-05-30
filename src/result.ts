@@ -32,3 +32,31 @@ export function assertErr<T, E>(
     throw new ResultAssertError(`Expected Err, but got Ok: ${result.value}`);
   }
 }
+
+export function throwableAsync<T, E, F extends (...args: any[]) => Promise<T>>(
+  fn: F,
+  mapErr: (error: unknown) => Err<E> = (error) => {
+    if (error instanceof Error) {
+      return err(error);
+    } else {
+      return err(new Error(`Unknown error: ${error}`) as any);
+    }
+  }
+): (...args: Parameters<F>) => Promise<Result<Awaited<ReturnType<F>>, Err<E>>> {
+  const f = async (...args: Parameters<F>): Promise<Result<T, E>> => {
+    try {
+      const v = await fn(...args);
+      return ok(v);
+    } catch (error) {
+      if (mapErr) {
+        return mapErr(error);
+      }
+      if (error instanceof Error) {
+        return err(error) as Err<E>;
+      } else {
+        return err(new Error(`Unknown error: ${error}`) as any);
+      }
+    }
+  };
+  return f as any;
+}

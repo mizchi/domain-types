@@ -2,6 +2,15 @@
 
 typescript utilities for domain modeling
 
+## Install
+
+```bash
+# node
+$ npm add @mizchi/domain-types
+# deno
+$ deno add jsr:@mizchi/domain-types
+```
+
 ## Result Types
 
 Simple result types with asserts

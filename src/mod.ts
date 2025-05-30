@@ -1,10 +1,11 @@
 export {
-  runEff,
+  perform,
+  performResult,
   eff,
-  createHandlers,
-  waitFor,
-  waitForAsync,
-  waitForSync,
+  defineEff,
+  defineHandlers,
+  type AsyncTask,
+  type Task,
   type Eff,
   type InferHandlers,
 } from "./eff.ts";

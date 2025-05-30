@@ -1,4 +1,4 @@
-import { Eff, eff, runEff, createHandlers, waitFor } from "../src/mod.ts";
+import { Eff, eff, perform, defineHandlers, AsyncTask } from "../src/mod.ts";
 
 type FsReadEffect = Eff<"fsRead", { path: string }>;
 type FsWriteEffect = Eff<"fsWrite", { path: string; content: string }>;
@@ -35,18 +35,28 @@ async function* writeFileTask(
   yield writeFile(path, content);
 }
 
+async function* dbQueryTask(
+  query: string
+): AsyncGenerator<DatabaseEffect, string[]> {
+  return yield dbQuery(query, []);
+}
+
+type ProgramEffect =
+  | ConsoleEffect
+  | FsReadEffect
+  | TimerEffect
+  | DatabaseEffect
+  | FsWriteEffect;
 // 複雑なワークフロー
-async function* program(): AsyncGenerator<
-  ConsoleEffect | FsReadEffect | TimerEffect | DatabaseEffect | FsWriteEffect
-> {
+async function* program(): AsyncTask<ProgramEffect, void> {
   yield print("Starting complex workflow...");
 
   // ファイル読み込み
-  const config = yield* waitFor(readFileTask("config.json"));
+  const config = yield* readFileTask("config.json");
   yield print(`Config loaded: ${config}`);
 
   // データベースクエリ
-  const users = yield dbQuery("SELECT * FROM users");
+  const users = yield* dbQueryTask("SELECT * FROM users");
   yield print(`Found ${users.length} users`);
 
   // 遅延
@@ -54,7 +64,7 @@ async function* program(): AsyncGenerator<
 
   // 結果をファイルに保存
   const report = `Report: ${users.length} users processed`;
-  yield* waitFor(writeFileTask("report.txt", report));
+  yield* writeFileTask("report.txt", report);
   yield delay(500);
 }
 
@@ -68,7 +78,7 @@ async function* program(): AsyncGenerator<
     | FsWriteEffect;
 
   // 型推論可能なハンドラーの作成
-  const handlers = createHandlers<ProgramEffect>({
+  const handlers = defineHandlers<ProgramEffect>({
     async console(payload) {
       console.log(`[CONSOLE] ${payload}`);
       return payload; // コンソール出力の結果を返す
@@ -118,7 +128,7 @@ async function* program(): AsyncGenerator<
 
   // 非同期プログラムの実行
   console.log("=== 非同期プログラムの実行 ===");
-  await runEff(program(), handlers);
+  await perform(program(), handlers);
 
   // 同期プログラムの例
   function* syncProgram(): Generator<ConsoleEffect | TimerEffect> {
@@ -129,5 +139,5 @@ async function* program(): AsyncGenerator<
 
   // 同期プログラムの実行
   console.log("\n=== 同期プログラムの実行 ===");
-  await runEff(syncProgram(), handlers);
+  await perform(syncProgram(), handlers);
 }

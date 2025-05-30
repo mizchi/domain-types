@@ -1,4 +1,4 @@
-import { ok, err, assertErr, assertOk, Result } from "../src/mod.ts";
+import { ok, err, assertErr, assertOk, type Result } from "../src/mod.ts";
 
 function getValue(v: number): Result<string, string> {
   if (v > 0) {

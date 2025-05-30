@@ -1,6 +1,6 @@
 {
   "name": "@mizchi/domain-types",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "Domain types for Deno",
   "tasks": {
@@ -9,7 +9,12 @@
   "exports": {
     ".": "./src/mod.ts"
   },
+  "exclude": ["npm"],
+  "test": {
+    "exclude": ["npm"]
+  },
   "imports": {
+    "@deno/dnt": "jsr:@deno/dnt@^0.42.1",
     "@std/expect": "jsr:@std/expect@^1.0.16"
   }
 }
