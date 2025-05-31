@@ -1,9 +1,10 @@
 {
   "name": "@mizchi/domain-types",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "license": "MIT",
   "description": "Domain types for Deno",
   "tasks": {
+    "build-npm": "deno run -A build.ts",
     "dev": "deno run --watch main.ts"
   },
   "exports": {
