@@ -50,32 +50,25 @@ Deno.test("perform: types", async () => {
 
 Deno.test("HandlersFor", async () => {
   if (TYPECHECK_ONLY) {
-    const none = defineEffect<"none">("none");
+    const none = defineEffect<"none", [], void>("none");
     const double = defineEffect<"double", [number], number>("double");
     type MyProgramEffect = EffectFor<typeof double> | EffectFor<typeof none>;
-    const _asyncHandlers = {
+    const _asyncHandlers: AsyncHandlersFor<MyProgramEffect> = {
       [double.t]: async (x: number) => x * 2,
-      [none.t]: () => undefined,
-    } satisfies AsyncHandlersFor<MyProgramEffect>;
+      [none.t]: () => {},
+    };
 
-    const _syncHandlers = {
-      [double.t]: (x: number) => x * 2,
-      [none.t]: async () => undefined,
-    } satisfies HandlersFor<MyProgramEffect>;
-    // function* _(): Generator<MyProgramEffect> {
-    //   const _1: void = yield* none();
-    //   // @ts-expect-error can not return without yield*
-    //   yield double(2);
-    //   // @ts-expect-error Input expected
-    //   yield* double("err");
-    //   const _2: number = yield* double(1);
-    // }
+    const _invalidSyncHandlers: HandlersFor<MyProgramEffect> = {
+      // @ts-expect-error can not take async handler in sync HandlersFor
+      [double.t]: async (x: number) => x * 2,
+      // @ts-expect-error can not take async handler in sync HandlersFor
+      [none.t]: async () => {},
+    };
 
-    // function* _sub(): Generator<EffectFor<typeof double>> {
-    //   const _: number = yield* double(2);
-    //   // @ts-expect-error can not yield
-    //   yield* none();
-    // }
+    const _validAsyncHandlers2: AsyncHandlersFor<MyProgramEffect> = {
+      [double.t]: async (x: number) => x * 2,
+      [none.t]: async () => {},
+    };
   }
 });
 

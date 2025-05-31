@@ -1,4 +1,12 @@
 type AnyArgs = Array<any>;
+// 厳密な型チェックのためのヘルパー型
+type ExplicitSync<F> = F extends (...args: any[]) => infer R
+  ? R extends void
+    ? F extends (...args: any[]) => void
+      ? F
+      : never
+    : F
+  : never;
 
 export type Effect<K extends string, A extends AnyArgs, R> = {
   key: K;
@@ -15,10 +23,9 @@ export type AsyncHandlersFor<E extends Effect<string, AnyArgs, any>> = {
 // Handlers型を推論するためのヘルパー型
 export type HandlersFor<E extends Effect<string, AnyArgs, any>> = {
   [K in E["key"]]: E extends Effect<K, infer A, infer R>
-    ? (...args: A) => R
+    ? ExplicitSync<(...args: A) => R>
     : never;
 };
-
 export type EffectFor<T extends EffectBuilder<string, AnyArgs, any>> =
   T extends EffectBuilder<infer K, infer A, infer F> ? Effect<K, A, F> : never;
 
@@ -48,19 +55,6 @@ export function defineEffect<
   // @ts-ignore
   builder.with = (t: T) => t;
   return builder as EffectBuilder<K, A, R>;
-}
-
-// Handlers型から推論するヘルパー関数
-export function defineAsyncHandlers<E extends Effect<any, AnyArgs, any>>(
-  handlers: AsyncHandlersFor<E>
-): AsyncHandlersFor<E> {
-  return handlers;
-}
-// Handlers型から推論するヘルパー関数
-export function defineHandlers<E extends Effect<any, AnyArgs, any>>(
-  handlers: HandlersFor<E>
-): HandlersFor<E> {
-  return handlers;
 }
 
 export type EffectResult<K extends string, A extends AnyArgs, R> = [
@@ -213,7 +207,7 @@ if (import.meta.main) {
 
   {
     // sync
-    const syncHandlers = defineHandlers<ProgramEffect>({
+    const syncHandlers: HandlersFor<ProgramEffect> = {
       [print.t](payload) {
         console.log(`print ${payload}`);
       },
@@ -225,14 +219,14 @@ if (import.meta.main) {
         // Simulate a network response
         return { ok: true, value: 42 };
       },
-    });
+    };
     for (const [key, args, result] of perform(program(), syncHandlers)) {
       console.log(`Step:`, key, args, result);
     }
   }
   {
     // async
-    const handlers = defineAsyncHandlers<ProgramEffect>({
+    const handlers: AsyncHandlersFor<ProgramEffect> = {
       [print.t](payload) {
         console.log(`print ${payload}`);
       },
@@ -244,7 +238,7 @@ if (import.meta.main) {
         console.log(`network ${JSON.stringify(url)}`);
         return { ok: true, value: 42 };
       },
-    });
+    };
     for await (const [key, args, result] of performAsync(program(), handlers)) {
       console.log(`Async Step`, key, args, result);
     }
