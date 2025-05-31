@@ -13,7 +13,7 @@ export {
   returns,
   EffectError,
   EffectMissingError,
-} from "./eff.ts";
+} from "./effect.ts";
 
 export { unreachable, UnreachableError } from "./unreachable.ts";
 export { assertErrorInstance } from "./error.ts";

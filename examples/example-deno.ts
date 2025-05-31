@@ -1,12 +1,12 @@
 import {
-  defineEffect,
-  performAsync,
   type EffectFor,
   type AsyncHandlersFor,
+  type HandlersFor,
+  defineEffect,
+  performAsync,
   effectFrom,
-  HandlersFor,
   perform,
-} from "../src/mod.ts";
+} from "@mizchi/domain-types";
 import path from "node:path";
 
 // Define effects using defineEffect

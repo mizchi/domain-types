@@ -8,7 +8,7 @@ import {
 import { expect } from "@std/expect";
 
 Deno.test("Effect Example", async () => {
-  const print = defineEffect<"print", [message: string], void>("print");
+  const print = defineEffect<"log", [message: string], void>("log");
   const readFile = defineEffect<"fsRead", [path: string], string>("fsRead");
   const writeFile = defineEffect<
     "fsWrite",
@@ -90,7 +90,7 @@ Deno.test("Effect Example", async () => {
 
   const xs = await Array.fromAsync(performAsync(program(), handlers));
   const expected: ResultStep<ProgramEffect>[] = [
-    ["print", ["Starting complex workflow..."], undefined],
+    ["log", ["Starting complex workflow..."], undefined],
     [
       "fsRead",
       ["config.json"],
@@ -105,7 +105,7 @@ Deno.test("Effect Example", async () => {
       ),
     ],
     [
-      "print",
+      "log",
       [
         `Config loaded: ${JSON.stringify(
           {
@@ -128,7 +128,7 @@ Deno.test("Effect Example", async () => {
         { id: 3, name: "Charlie" },
       ],
     ],
-    ["print", ["Found 3 users"], undefined],
+    ["log", ["Found 3 users"], undefined],
     ["timer", [100], undefined],
     ["fsWrite", ["report.txt", "Report: 3 users processed"], undefined],
     ["timer", [100], undefined],

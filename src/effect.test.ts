@@ -1,7 +1,5 @@
 import {
   type AsyncHandlersFor,
-  type Effect,
-  type EffectBuilder,
   type EffectFor,
   type HandlersFor,
   type ResultStep,
@@ -9,7 +7,7 @@ import {
   performAsync,
   perform,
   EffectError,
-} from "./eff.ts";
+} from "./effect.ts";
 import { expect } from "@std/expect";
 import { unreachable } from "./unreachable.ts";
 import { assertErrorInstance } from "./error.ts";
