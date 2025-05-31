@@ -1,15 +1,9 @@
 export {
-  perform,
-  performResult,
-  eff,
-  defineEff,
-  defineHandlers,
-  defineTask,
-  type AsyncTask,
-  type Task,
-  type Eff,
-  type InferHandlers,
-  type AsEffResult,
+  defineEffect as defineEff,
+  performAsync,
+  perform as performSync,
+  type Effect as Eff,
+  type EffectFor,
 } from "./eff.ts";
 
 export { unreachable, UnreachableError } from "./unreachable.ts";
