@@ -1,13 +1,5 @@
-import {
-  type Eff,
-  eff,
-  perform,
-  defineHandlers,
-  AsyncTask,
-  Task,
-} from "../src/mod.ts";
+import { perform } from "../src/mod.ts";
 import path from "node:path";
-import { performResult } from "../src/eff.ts";
 import { run } from "node:test";
 
 type FsReadEffect = Eff<"fsRead", (p: { path: string }) => string>;

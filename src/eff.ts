@@ -1,10 +1,10 @@
 type AnyArgs = Array<any>;
+// type Sync<T> = T extends Promise<any> ? never : T;
+
 // 厳密な型チェックのためのヘルパー型
-type ExplicitSync<F> = F extends (...args: any[]) => infer R
-  ? R extends void
-    ? F extends (...args: any[]) => void
-      ? F
-      : never
+type ExplicitSync<F> = F extends (...args: any[]) => any
+  ? F extends (...args: any[]) => Promise<any>
+    ? never
     : F
   : never;
 
@@ -14,6 +14,20 @@ export type Effect<K extends string, A extends AnyArgs, R> = {
   return: R;
 };
 
+export type EffectResult<K extends string, A extends AnyArgs, R> = [
+  effect: K,
+  args: A,
+  return$: R
+];
+
+export type ResultStep<E extends Effect<any, AnyArgs, any>> = E extends Effect<
+  infer K,
+  infer A,
+  infer R
+>
+  ? EffectResult<K, A, R>
+  : never;
+
 export type AsyncHandlersFor<E extends Effect<string, AnyArgs, any>> = {
   [K in E["key"]]: E extends Effect<K, infer A, infer R>
     ? (...args: A) => R | Promise<R>
@@ -22,7 +36,7 @@ export type AsyncHandlersFor<E extends Effect<string, AnyArgs, any>> = {
 
 // Handlers型を推論するためのヘルパー型
 export type HandlersFor<E extends Effect<string, AnyArgs, any>> = {
-  [K in E["key"]]: E extends Effect<K, infer A, infer R>
+  [K in E["key"]]: E extends Effect<K, infer A, Awaited<infer R>>
     ? ExplicitSync<(...args: A) => R>
     : never;
 };
@@ -38,7 +52,7 @@ export type EffectBuilder<K extends string, A extends Array<any>, R> = {
 export function defineEffect<
   K extends string,
   A extends AnyArgs = [],
-  R = void
+  R = void | undefined
 >(key: K): EffectBuilder<K, A, R> {
   const builder: EffectBuilder<K, A, R> = ((...args: A) => {
     const g = (function* () {
@@ -57,20 +71,6 @@ export function defineEffect<
   return builder as EffectBuilder<K, A, R>;
 }
 
-export type EffectResult<K extends string, A extends AnyArgs, R> = [
-  effect: K,
-  args: A,
-  return$: R
-];
-
-export type ResultStep<E extends Effect<any, AnyArgs, any>> = E extends Effect<
-  infer K,
-  infer A,
-  infer R
->
-  ? EffectResult<K, A, R>
-  : never;
-
 export async function* performAsync<E extends Effect<any, AnyArgs, any>, R>(
   generator: AsyncGenerator<E, R, any> | Generator<E, R, any>,
   handlers: AsyncHandlersFor<E>
@@ -79,7 +79,7 @@ export async function* performAsync<E extends Effect<any, AnyArgs, any>, R>(
   try {
     result = await generator.next();
   } catch (error) {
-    throw new EffectHandlerError(
+    throw new EffectError(
       error instanceof Error ? error : new Error(String(error)),
       "init",
       undefined,
@@ -99,7 +99,7 @@ export async function* performAsync<E extends Effect<any, AnyArgs, any>, R>(
     try {
       handlerReturn = await handler(...effect.args);
     } catch (error) {
-      throw new EffectHandlerError(
+      throw new EffectError(
         error instanceof Error ? error : new Error(String(error)),
         "handler",
         effect.key,
@@ -110,18 +110,21 @@ export async function* performAsync<E extends Effect<any, AnyArgs, any>, R>(
       result = await generator.next(handlerReturn);
       yield [effect.key, effect.args, handlerReturn] as ResultStep<E>;
     } catch (error) {
-      throw new EffectGeneratorError(
-        error instanceof Error ? error : new Error(String(error))
+      throw new EffectError(
+        error instanceof Error ? error : new Error(String(error)),
+        "generator",
+        effect.key,
+        effect.args
       );
     }
   }
 }
 
 const EFFECT_ERROR_MESSAGE = "EffectError";
-export class EffectHandlerError extends Error {
+export class EffectError extends Error {
   constructor(
     originalError: Error | string,
-    public step: "handler" | "init",
+    public step: "handler" | "init" | "generator",
     public readonly key: string | undefined,
     public readonly args: AnyArgs
   ) {
@@ -131,12 +134,6 @@ export class EffectHandlerError extends Error {
     super(`${EFFECT_ERROR_MESSAGE}: ${message}`, {
       cause: originalError,
     });
-  }
-}
-
-export class EffectGeneratorError extends Error {
-  constructor(public originalError: Error | string) {
-    super(`EffectItarateError`, { cause: originalError });
   }
 }
 
@@ -163,7 +160,7 @@ export function* perform<E extends Effect<any, AnyArgs, any>, TResult>(
       result = g.next(handlerResult);
       yield [effect.key, effect.args, handlerResult] as ResultStep<E>;
     } catch (error) {
-      throw new EffectHandlerError(
+      throw new EffectError(
         error instanceof Error ? error : new Error(String(error)),
         "handler",
         effect.key,
@@ -245,7 +242,7 @@ if (import.meta.main) {
   }
   {
     // async
-    const none = defineEffect<"none">("none");
+    const none = defineEffect<"none", [], undefined>("none");
     const lazy1 = defineEffect<"lazy1", [input: number], number>("lazy1");
     const lazy2 = defineEffect<"lazy2", [], string>("lazy2");
     type MyProgramEffect =
@@ -257,15 +254,14 @@ if (import.meta.main) {
       const _2: string = yield* lazy2();
       const _3: void = yield* none();
     };
-    // type NoneEffectResult = ResultFromEffect<EffectFor<typeof none>>;
-    // type Lazy1EffectResult = ResultFromEffect<EffectFor<typeof lazy1>>;
-
     type MergedEffectResult = ResultStep<MyProgramEffect>;
-    const h = {
+    const h: AsyncHandlersFor<MyProgramEffect> = {
       [lazy1.t]: async (input: number) => input * 2,
       [lazy2.t]: () => "lazyValue",
-      [none.t]: () => undefined,
-    } satisfies AsyncHandlersFor<MyProgramEffect>;
+      [none.t]: async () => {
+        return undefined;
+      },
+    };
 
     const steps1: AsyncGenerator<ResultStep<MyProgramEffect>> = performAsync(
       myProgram(),
