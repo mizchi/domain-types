@@ -11,55 +11,9 @@ $ npm add @mizchi/domain-types
 $ deno add jsr:@mizchi/domain-types
 ```
 
-## Result Types
+## Effect Generator
 
-Simple result types with asserts
-
-```ts
-import {
-  ok,
-  err,
-  assertErr,
-  assertOk,
-  type Result,
-} from "@mizchi/domain-types";
-
-function getValue(v: number): Result<string, string> {
-  if (v > 0) {
-    return ok("Value is positive");
-  }
-  return err("Value must be positive");
-}
-
-Deno.test("Result", () => {
-  const result: Result<string, string> = getValue(5);
-  if (result.ok) {
-    const _: string = result.value;
-  } else {
-    const _: string = result.error;
-  }
-});
-
-Deno.test("Result: ok case", () => {
-  const result = getValue(10);
-  // @ts-expect-error
-  result.value;
-  assertOk(result);
-  console.log(result.value);
-});
-
-Deno.test("Result: err case", () => {
-  const result = getValue(-5);
-  // @ts-expect-error
-  result.error;
-  assertErr(result);
-  console.log(result.error);
-});
-```
-
-## Effect Types
-
-Generator Style Effect handler
+Thin effect-system like generator nspired by https://effect.website/ and https://koka-lang.github.io/koka/doc/index.html
 
 ### simple usecase
 
@@ -70,19 +24,28 @@ import {
   performAsync,
 } from "@mizchi/domain-types";
 
-const log = defineEffect<"log", [message: string], void>("log");
+const log = defineEffect<
+  // unique effect key
+  "log",
+  // parameter types
+  [message: string],
+  // return type
+  void
+>("log");
 const val = defineEffect<"val", [], number>("val");
 type ProgramEffect = EffectFor<typeof log> | EffectFor<typeof val>;
 
 async function* program(): AsyncGenerator<ProgramEffect> {
-  const v = yield* val();
+  const v = yield* val(); // return by handler
   yield* log(`v:${v}`);
 }
 
 // with 42
 console.log(
   await Array.fromAsync(
+    // AsyncGenerator
     performAsync(program(), {
+      // run program with handlers
       [log.t]: async (message) => {
         console.log(`[log] ${message}`);
       },
@@ -194,6 +157,64 @@ console.log(
   })
 );
 // => [ "val", [], 42 ]
+```
+
+## Result
+
+Simple result types with asserts inspired by https://github.com/supermacro/neverthrow
+
+```ts
+import {
+  ok,
+  err,
+  assertErr,
+  assertOk,
+  type Result,
+} from "@mizchi/domain-types";
+
+function getValue(v: number): Result<string, string> {
+  if (v > 0) {
+    return ok("Value is positive");
+  }
+  return err("Value must be positive");
+}
+
+Deno.test("Result", () => {
+  const result: Result<string, string> = getValue(5);
+  if (result.ok) {
+    const _: string = result.value;
+  } else {
+    const _: string = result.error;
+  }
+});
+
+Deno.test("Result: ok case", () => {
+  const result = getValue(10);
+  // @ts-expect-error
+  result.value;
+  assertOk(result);
+  console.log(result.value);
+});
+
+Deno.test("Result: err case", () => {
+  const result = getValue(-5);
+  // @ts-expect-error
+  result.error;
+  assertErr(result);
+  console.log(result.error);
+});
+```
+
+## Error
+
+```ts
+import { assertErrorInstance } from "@mizchi/domain-types";
+Deno.test("assertError", () => {
+  class MyError extends Error {}
+  const e = new MyError("test error") as any;
+  assertErrorInstance(e, MyError);
+  const _: MyError = e; // should not throw
+});
 ```
 
 ## LICENSE
