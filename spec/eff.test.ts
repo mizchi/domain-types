@@ -1,101 +1,65 @@
 import {
-  Eff,
-  eff,
-  perform,
-  defineHandlers,
-  AsyncTask,
-  performResult,
-  assertErr,
-  assertOk,
+  defineEffect,
+  type EffectFor,
+  type AsyncHandlersFor,
+  performAsync,
+  type ResultStep,
 } from "../src/mod.ts";
 import { expect } from "@std/expect";
 
-type PrintEffect = Eff<"print", (p: string) => void>;
-function print(message: string): PrintEffect {
-  return eff("print", message);
-}
-
-Deno.test("Eff Example", async () => {
-  type FsReadEffect = Eff<"fsRead", (p: { path: string }) => string>;
-  type FsWriteEffect = Eff<
+Deno.test("Effect Example", async () => {
+  const print = defineEffect<"print", [message: string], void>("print");
+  const readFile = defineEffect<"fsRead", [path: string], string>("fsRead");
+  const writeFile = defineEffect<
     "fsWrite",
-    (p: { path: string; content: string }) => void
-  >;
-  type TimerEffect = Eff<"timer", (p: number) => void>;
-  type DatabaseEffect = Eff<
+    [path: string, content: string],
+    void
+  >("fsWrite");
+  const delay = defineEffect<"timer", [ms: number], void>("timer");
+  const dbQuery = defineEffect<
     "database",
-    (p: { query: string; params?: any[] }) => any[]
-  >;
+    [query: string, params?: any[]],
+    any[]
+  >("database");
 
-  function readFile(path: string): FsReadEffect {
-    return eff("fsRead", { path });
-  }
-  function writeFile(path: string, content: string): FsWriteEffect {
-    return eff("fsWrite", { path, content });
-  }
-  function delay(ms: number): TimerEffect {
-    return eff("timer", ms);
-  }
-  function dbQuery(query: string, params?: any[]): DatabaseEffect {
-    return eff("database", { query, params });
-  }
-
-  async function* readFileTask(
-    path: string
-  ): AsyncGenerator<FsReadEffect, string> {
-    return yield readFile(path);
-  }
-
-  async function* writeFileTask(
-    path: string,
-    content: string
-  ): AsyncGenerator<FsWriteEffect, void> {
-    yield writeFile(path, content);
-  }
+  type ProgramEffect =
+    | EffectFor<typeof print>
+    | EffectFor<typeof readFile>
+    | EffectFor<typeof writeFile>
+    | EffectFor<typeof delay>
+    | EffectFor<typeof dbQuery>;
 
   // 複雑なワークフロー
-  async function* program(): AsyncGenerator<
-    PrintEffect | FsReadEffect | TimerEffect | DatabaseEffect | FsWriteEffect
-  > {
-    yield print("Starting complex workflow...");
+  async function* program(): AsyncGenerator<ProgramEffect> {
+    yield* print("Starting complex workflow...");
 
     // ファイル読み込み
-    const config = yield* readFileTask("config.json");
-    yield print(`Config loaded: ${config}`);
+    const config = yield* readFile("config.json");
+    yield* print(`Config loaded: ${config}`);
 
     // データベースクエリ
-    const users = yield dbQuery("SELECT * FROM users");
-    yield print(`Found ${users.length} users`);
+    const users = yield* dbQuery("SELECT * FROM users");
+    yield* print(`Found ${users.length} users`);
 
     // 遅延
-    yield delay(500);
+    yield* delay(100);
 
     // 結果をファイルに保存
     const report = `Report: ${users.length} users processed`;
-    yield* writeFileTask("report.txt", report);
-    yield delay(500);
+    yield* writeFile("report.txt", report);
+    yield* delay(100);
   }
 
   // Effect型の定義（プログラムで使用される全てのエフェクト）
-  type ProgramEffect =
-    | PrintEffect
-    | FsReadEffect
-    | TimerEffect
-    | DatabaseEffect
-    | FsWriteEffect;
 
   // 型推論可能なハンドラーの作成
-  const handlers = defineHandlers<ProgramEffect>({
-    async print(payload) {
-      console.log(`[CONSOLE] ${payload}`);
-      return payload; // コンソール出力の結果を返す
+  const handlers: AsyncHandlersFor<ProgramEffect> = {
+    async [print.t](message) {
+      return undefined;
     },
-    async fsRead(payload) {
-      const { path } = payload;
-      console.log(`[FILE READ] ${path}`);
-
+    async [readFile.t](path) {
       // ファイル読み込みをシミュレート
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 0));
       return JSON.stringify(
         {
           type: "config",
@@ -106,91 +70,69 @@ Deno.test("Eff Example", async () => {
         2
       );
     },
-    fsWrite: async (payload) => {
-      const { path, content } = payload;
+    [writeFile.t]: async (path, content) => {
       // ファイル書き込みをシミュレート
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      console.log(`[FILE WRITE] ${path}: ${content}`);
+      await new Promise((resolve) => setTimeout(resolve, 0));
       return undefined;
     },
 
-    timer: async (payload) => {
-      console.log(`[TIMER] Waiting ${payload}ms...`);
-      await new Promise((resolve) => setTimeout(resolve, payload));
-      console.log(`[TIMER] Wait completed`);
+    [delay.t]: async (ms) => {
+      await new Promise((resolve) => setTimeout(resolve, ms));
     },
-
-    database: async (payload) => {
-      const { query, params } = payload;
-      console.log(`[DB] Executing: ${query}`, params);
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      // モックデータを返す
+    [dbQuery.t]: async (query, params) => {
       return [
         { id: 1, name: "Alice" },
         { id: 2, name: "Bob" },
         { id: 3, name: "Charlie" },
       ];
     },
-  });
-
-  // 非同期プログラムの実行
-  console.log("=== 非同期プログラムの実行 ===");
-  await perform(program(), handlers);
-
-  // 同期プログラムの例
-  function* syncProgram(): Generator<PrintEffect | TimerEffect> {
-    yield print("同期プログラム開始");
-    yield delay(100);
-    yield print("同期プログラム完了");
-  }
-
-  // 同期プログラムの実行
-  console.log("\n=== 同期プログラムの実行 ===");
-  await perform(syncProgram(), handlers);
-});
-
-Deno.test("performResult", async () => {
-  type ProgramEffect = PrintEffect;
-  const handlers = defineHandlers<ProgramEffect>({
-    async print(payload) {
-      console.log(`[CONSOLE] ${payload}`);
-      return payload; // コンソール出力の結果を返す
-    },
-  });
-  const program = async function* (): AsyncTask<ProgramEffect, number> {
-    yield print("A");
-    yield print("B");
-    return 1;
   };
-  const result = await performResult(program(), handlers);
-  assertOk(result);
-  expect(result.value).toBe(1);
-  expect(result.steps).toEqual([
-    { eff: "print", payload: "A" },
-    { eff: "print", payload: "B" },
-  ]);
-});
 
-Deno.test("performResult with error", async () => {
-  type ProgramEffect = PrintEffect;
-  const handlers = defineHandlers<ProgramEffect>({
-    async print(payload) {
-      console.log(`[CONSOLE] ${payload}`);
-      return payload; // コンソール出力の結果を返す
-    },
-  });
-  const program = async function* (): AsyncTask<ProgramEffect, number> {
-    yield print("A");
-    let flag: boolean = true;
-    if (flag) {
-      throw new Error("Stop");
-    }
-    yield print("B");
-    return 1;
-  };
-  const result = await performResult(program(), handlers);
+  const xs = await Array.fromAsync(performAsync(program(), handlers));
+  const expected: ResultStep<ProgramEffect>[] = [
+    ["print", ["Starting complex workflow..."], undefined],
+    [
+      "fsRead",
+      ["config.json"],
+      JSON.stringify(
+        {
+          type: "config",
+          path: "config.json",
+          data: { setting1: "value1", setting2: "value2" },
+        },
+        null,
+        2
+      ),
+    ],
+    [
+      "print",
+      [
+        `Config loaded: ${JSON.stringify(
+          {
+            type: "config",
+            path: "config.json",
+            data: { setting1: "value1", setting2: "value2" },
+          },
+          null,
+          2
+        )}`,
+      ],
+      undefined,
+    ],
+    [
+      "database",
+      ["SELECT * FROM users"],
+      [
+        { id: 1, name: "Alice" },
+        { id: 2, name: "Bob" },
+        { id: 3, name: "Charlie" },
+      ],
+    ],
+    ["print", ["Found 3 users"], undefined],
+    ["timer", [100], undefined],
+    ["fsWrite", ["report.txt", "Report: 3 users processed"], undefined],
+    ["timer", [100], undefined],
+  ];
 
-  assertErr(result);
-  expect(result.steps).toEqual([{ eff: "print", payload: "A" }]);
-  expect(result.error).toBeInstanceOf(Error);
+  expect(xs).toEqual(expected);
 });

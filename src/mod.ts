@@ -1,12 +1,16 @@
 export {
   type AsyncHandlersFor,
+  type Effect,
   type EffectBuilder,
   type EffectFor,
   type HandlersFor,
   type ResultStep,
   defineEffect,
+  effectFrom,
   performAsync,
   perform,
+  none,
+  returns,
   EffectError,
   EffectMissingError,
 } from "./eff.ts";

@@ -71,6 +71,12 @@ export function defineEffect<
   return builder as EffectBuilder<K, A, R>;
 }
 
+export function effectFrom<K extends string, F extends (...args: any[]) => any>(
+  k: K
+) {
+  return defineEffect<K, Parameters<F>, Awaited<ReturnType<F>>>(k);
+}
+
 export async function* performAsync<E extends Effect<any, AnyArgs, any>, R>(
   generator: AsyncGenerator<E, R, any> | Generator<E, R, any>,
   handlers: AsyncHandlersFor<E>
@@ -119,6 +125,12 @@ export async function* performAsync<E extends Effect<any, AnyArgs, any>, R>(
     }
   }
 }
+
+export const none = () => {};
+export const returns =
+  <T>(v: T) =>
+  () =>
+    v;
 
 const EFFECT_ERROR_MESSAGE = "EffectError";
 export class EffectError extends Error {
@@ -171,7 +183,7 @@ export function* perform<E extends Effect<any, AnyArgs, any>, TResult>(
 }
 
 if (import.meta.main) {
-  const print = defineEffect<"print", [input: string], void>("print");
+  const print = defineEffect<"log", [input: string], void>("log");
   const delay = defineEffect<"delay", [ms: number], void>("delay");
   const network = defineEffect<
     "network",

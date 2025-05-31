@@ -1,5 +1,6 @@
 import {
   type AsyncHandlersFor,
+  type Effect,
   type EffectBuilder,
   type EffectFor,
   type HandlersFor,

@@ -64,16 +64,16 @@ function print(message: string): ConsoleEffect {
   return eff("console", message);
 }
 function readFile(path: string): FsReadEffect {
-  return eff("fsRead", { path });
+  return eff("Deno$readTextFile", { path });
 }
 function writeFile(path: string, content: string): FsWriteEffect {
-  return eff("fsWrite", { operation: "write", path, content });
+  return eff("Deno$writeTextFile", { operation: "write", path, content });
 }
 function delay(ms: number): TimerEffect {
   return eff("timer", ms);
 }
 function dbQuery(query: string, params?: any[]): DatabaseEffect {
-  return eff("database", { query, params });
+  return eff("query", { query, params });
 }
 
 async function* readFileTask(
