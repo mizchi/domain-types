@@ -4,10 +4,12 @@ export {
   eff,
   defineEff,
   defineHandlers,
+  defineTask,
   type AsyncTask,
   type Task,
   type Eff,
   type InferHandlers,
+  type AsEffResult,
 } from "./eff.ts";
 
 export { unreachable, UnreachableError } from "./unreachable.ts";

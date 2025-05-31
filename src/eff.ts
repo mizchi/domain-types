@@ -1,17 +1,39 @@
 import { err, ok, Result } from "./result.ts";
 
-export type Eff<T extends string, P = void> = {
+export type Eff<T extends string, F extends (p: any) => any> = {
   eff: T;
-  payload: P;
+  payload: Parameters<F>[0];
+  __result__: ReturnType<F>; // Optional result type for the effect
 };
 
-export function eff<T extends string, P = void>(eff: T, payload: P): Eff<T, P> {
-  return { eff, payload };
+export function eff<T extends string, F extends (p: any) => any>(
+  eff: T,
+  payload: Parameters<F>[0]
+): Eff<T, F> {
+  return { eff, payload } as Eff<T, F>;
 }
 
-export function defineEff<K extends string, P>(eff: K): (p: P) => Eff<K, P> {
-  return (payload: P): Eff<K, P> => {
-    return { eff, payload };
+export function defineEff<K extends string, F extends (p: any) => any>(
+  eff: K
+): (p: Parameters<F>[0]) => Eff<K, F> {
+  return (payload: Parameters<F>[0]): Eff<K, F> => {
+    return { eff, payload, __result__: undefined } as Eff<K, F>;
+  };
+}
+
+// Effect結果型を推論するヘルパー型
+export type AsEffResult<T extends Eff<any, any>> = T extends Eff<any, infer F>
+  ? F extends (p: any) => infer R
+    ? NonNullable<R>
+    : never
+  : never;
+
+// タスク定義のヘルパー関数
+export function defineTask<E extends Eff<any, any>>(
+  handler: (eff: E) => Promise<AsEffResult<E> | any>
+) {
+  return async function* (i: E): AsyncGenerator<E, AsEffResult<E>> {
+    return yield handler(i);
   };
 }
 

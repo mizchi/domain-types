@@ -2,28 +2,49 @@ import {
   type Eff,
   defineHandlers,
   defineEff,
-  Task,
   performResult,
+  defineTask,
+  type AsEffResult,
 } from "../src/mod.ts";
 
-type PrintEff = Eff<"print", string>;
-type DelayEff = Eff<"delay", number>;
-type NetworkEff = Eff<"network", { url: string }>;
+type PrintEff = Eff<"print", (p: string) => void>;
+type DelayEff = Eff<"delay", (p: number) => void>;
+type NetworkEff = Eff<
+  "network",
+  (p: { url: string }) => {
+    ok: boolean;
+    value: number;
+  }
+>;
 
-const print = defineEff<"print", string>("print");
-const delay = defineEff<"delay", number>("delay");
-const doFetch = defineEff<"network", { url: string }>("network");
+const print = defineEff<"print", (p: string) => void>("print");
+const delay = defineEff<"delay", (p: number) => void>("delay");
+const doFetch = defineEff<
+  "network",
+  (p: { url: string }) => {
+    ok: boolean;
+    value: number;
+  }
+>("network");
 
-// effect with return value
+const myTask = defineTask<NetworkEff>(async (eff) => {
+  // Simulate a network request
+  console.log(`Fetching from ${eff.payload.url}`);
+  return {
+    ok: true,
+    value: 42,
+  };
+});
+
 function* runFetchTask(): Generator<
   NetworkEff,
   { ok: boolean; value: number }
 > {
-  return yield doFetch({
+  const v = yield doFetch({
     url: "https://example.com/api/data",
   });
+  return v as AsEffResult<NetworkEff>;
 }
-
 function* subTask(): Generator<PrintEff, void> {
   yield print("a");
   yield print("b");

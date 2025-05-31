@@ -10,22 +10,28 @@ import {
 } from "../src/mod.ts";
 import { expect } from "@std/expect";
 
-type PrintEffect = Eff<"print", string>;
+type PrintEffect = Eff<"print", (p: string) => void>;
 function print(message: string): PrintEffect {
   return eff("print", message);
 }
 
 Deno.test("Eff Example", async () => {
-  type FsReadEffect = Eff<"fsRead", { path: string }>;
-  type FsWriteEffect = Eff<"fsWrite", { path: string; content: string }>;
-  type TimerEffect = Eff<"timer", number>;
-  type DatabaseEffect = Eff<"database", { query: string; params?: any[] }>;
+  type FsReadEffect = Eff<"fsRead", (p: { path: string }) => string>;
+  type FsWriteEffect = Eff<
+    "fsWrite",
+    (p: { path: string; content: string }) => void
+  >;
+  type TimerEffect = Eff<"timer", (p: number) => void>;
+  type DatabaseEffect = Eff<
+    "database",
+    (p: { query: string; params?: any[] }) => any[]
+  >;
 
   function readFile(path: string): FsReadEffect {
     return eff("fsRead", { path });
   }
   function writeFile(path: string, content: string): FsWriteEffect {
-    return eff("fsWrite", { operation: "write", path, content });
+    return eff("fsWrite", { path, content });
   }
   function delay(ms: number): TimerEffect {
     return eff("timer", ms);

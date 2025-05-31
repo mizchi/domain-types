@@ -10,11 +10,24 @@ import path from "node:path";
 import { performResult } from "../src/eff.ts";
 import { run } from "node:test";
 
-type FsReadEffect = Eff<"fsRead", { path: string }>;
-type FsWriteEffect = Eff<"fsWrite", { path: string; content: string }>;
-type NetworkEffect = Eff<"network", { url: string; init: RequestInit }>;
-type EnvEffect = Eff<"env", { key: string }>;
-type RunEffect = Eff<"run", { command: string; args: string[] }>;
+type FsReadEffect = Eff<"fsRead", (p: { path: string }) => string>;
+type FsWriteEffect = Eff<
+  "fsWrite",
+  (p: { path: string; content: string }) => void
+>;
+type NetworkEffect = Eff<
+  "network",
+  (p: { url: string; init: RequestInit }) => Response
+>;
+type EnvEffect = Eff<"env", (p: { key: string }) => string | undefined>;
+type RunEffect = Eff<
+  "run",
+  (p: { command: string; args: string[] }) => {
+    success: boolean;
+    stdout: string;
+    stderr: string;
+  }
+>;
 type DenoProgramEffect =
   | FsReadEffect
   | FsWriteEffect
@@ -86,7 +99,7 @@ const denoHandlers = defineHandlers<DenoProgramEffect>({
 });
 
 /// -----------
-type LogEffect = Eff<"log", string>;
+type LogEffect = Eff<"log", (p: string) => void>;
 function log(message: string): LogEffect {
   return eff("log", message);
 }

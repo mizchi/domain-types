@@ -8,7 +8,7 @@ import {
   Task,
 } from "../src/mod.ts";
 
-type PrintEffect = Eff<"print", any[]>;
+type PrintEffect = Eff<"print", (p: any[]) => void>;
 
 function print(...args: any[]): PrintEffect {
   return eff("print", args);
