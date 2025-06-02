@@ -9,13 +9,12 @@ import {
   EffectMissingError,
   EffectHandlerError,
   Effect,
-  extend,
+  extendSync,
   type ExtendEffect,
 } from "./effect.ts";
 import { expect } from "@std/expect";
 import { unreachable } from "./unreachable.ts";
 import { assertErrorInstance } from "./error.ts";
-import { stringify } from "node:querystring";
 
 Deno.test("performSync", async (t) => {
   await t.step("sync minimum", () => {
@@ -115,11 +114,8 @@ Deno.test("performSync", async (t) => {
       c.of([], undefined),
       d.of([], undefined),
     ]);
-
-    // const _0: AsyncGenerator<EffectFor<typeof a | typeof b | typeof c>> = main();
   });
   await t.step("with extensible effects", () => {
-    // test
     const x = defineEffect<"x">("x");
     const y = defineEffect<"y", [], string>("y");
     const z = defineEffect<"z", [], number>("z");
@@ -134,17 +130,16 @@ Deno.test("performSync", async (t) => {
     const extended = function* (): Generator<ExtendedEffect> {
       yield* y(); // "ex:y"
       yield* z(); // 4
+      return true;
     };
 
     const myProgram = function* (): Generator<MyProgramEffect> {
       yield* x(); // 1
       yield* y(); // "y"
-      const exg = extend("ex", extended(), {
+      const _: boolean = yield* extendSync("ex", extended(), {
         [y.t]: () => "ex:y",
         [z.t]: () => 4,
       });
-
-      yield* exg;
     };
 
     const result: MyProgramEffect[] = Array.from(
@@ -156,18 +151,8 @@ Deno.test("performSync", async (t) => {
     const expected: MyProgramEffect[] = [
       x.of([], undefined),
       y.of([], "y"),
-      {
-        t: "ex:y",
-        args: [],
-        return: "ex:y",
-        extended: true,
-      },
-      {
-        t: "ex:z",
-        args: [],
-        return: 4,
-        extended: true,
-      },
+      y.extendedOf("ex", [], "ex:y"),
+      z.extendedOf("ex", [], 4),
     ];
     expect(result).toEqual(expected);
   });

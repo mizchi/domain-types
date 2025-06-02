@@ -13,7 +13,7 @@ export type Effect<K extends string, A extends AnyArgs, R> = {
   t: K;
   args: A;
   return: R;
-  extended?: boolean;
+  extended?: boolean; // Indicates if this effect is extended
 };
 
 /**
@@ -86,6 +86,23 @@ export type EffectBuilder<K extends string, A extends AnyArgs, R> = {
    * The unique key for this effect.
    * @example
    */
+
+  /**
+   * Creates an effect from the given arguments and return value.
+   * @param args The arguments to pass to the effect
+   * @param returns The return value of the effect
+   * @returns The created effect
+   */
+  extendedOf: <EK extends string>(
+    scope: EK,
+    args: A,
+    returns: R
+  ) => Effect<`${EK}/${K}`, A, R> & { extended: true };
+  /**
+   * The unique key for this effect.
+   * @example
+   */
+
   t: K;
 };
 
@@ -119,6 +136,15 @@ export function defineEffect<
     } as unknown as Effect<EffectKey, Args, Return>);
   }) as any;
   builder.t = key;
+  // @ts-ignore
+  builder.extendedOf = <EK extends string>(s: EK, args: Args, r: Return) =>
+    ({
+      t: `${s}/${key}`,
+      args,
+      return: r,
+      extended: true,
+    } as Effect<`${EK}/${EffectKey}`, Args, Return>);
+
   builder.of = (args: Args, r: Return) =>
     ({
       t: key,
@@ -183,6 +209,7 @@ export function* performSync<E extends Effect<string, AnyArgs, any>, R>(
           t: effect.t,
           args: effect.args,
           return: undefined as any,
+          extended: effect.extended,
         }
       );
     }
@@ -246,6 +273,7 @@ export async function* performAsync<E extends Effect<string, AnyArgs, any>, R>(
           t: effect.t,
           args: effect.args,
           return: undefined as any,
+          extended: effect.extended,
         }
       );
     }
@@ -354,20 +382,21 @@ export type ExtendEffect<
   ExKey extends string,
   E extends Effect<string, AnyArgs, any>
 > = E extends Effect<infer K, infer A, infer R>
-  ? Effect<`${ExKey}:${K}`, A, R> & { extended: true }
+  ? Effect<`${ExKey}/${K}`, A, R> & { extended: true }
   : never;
 
 /**
  * extend generator with new effects and handlers.
  */
-export function* extend<
+export function* extendSync<
   Ex extends string,
-  E extends Effect<string, AnyArgs, any>
+  E extends Effect<string, AnyArgs, any>,
+  R
 >(
   exKey: Ex,
-  g: Generator<E>,
-  h: HandlersFor<E>
-): Generator<ExtendEffect<Ex, E>> {
+  g: Generator<E, R>,
+  h: SyncHandlersFor<E>
+): Generator<ExtendEffect<Ex, E>, R> {
   let result = g.next();
   while (!result.done) {
     const effect = result.value;
@@ -378,10 +407,42 @@ export function* extend<
     const handlerResult = handler(...effect.args);
     result = g.next(handlerResult);
     yield {
+      t: `${exKey}/${effect.t}`,
+      args: effect.args,
+      return: handlerResult,
+      extended: true,
+    } as ExtendEffect<Ex, E>;
+  }
+  return result.value as R;
+}
+
+/**
+ * extend generator with new effects and handlers.
+ */
+export async function* extend<
+  Ex extends string,
+  E extends Effect<string, AnyArgs, any>,
+  R
+>(
+  exKey: Ex,
+  g: AsyncGenerator<E, R>,
+  h: HandlersFor<E>
+): AsyncGenerator<ExtendEffect<Ex, E>, R> {
+  let result = await g.next();
+  while (!result.done) {
+    const effect = result.value;
+    const handler = (h as any)[effect.t];
+    if (!handler) {
+      throw new EffectMissingError(effect.t);
+    }
+    const handlerResult = await handler(...effect.args);
+    result = await g.next(handlerResult);
+    yield {
       t: `${exKey}:${effect.t}`,
       args: effect.args,
       return: handlerResult,
       extended: true,
     } as ExtendEffect<Ex, E>;
   }
+  return result.value as R;
 }
