@@ -54,6 +54,66 @@ Deno.test("performSync", async (t) => {
     ];
     expect(result).toEqual(expected);
   });
+  await t.step("infer Effect from implementation", async () => {
+    const a = defineEffect<"a">("a");
+    const b = defineEffect<"b">("b");
+    const c = defineEffect<"c">("c");
+    const d = defineEffect<"d">("d");
+
+    function* subSync() {
+      yield* b();
+      yield* c();
+    }
+    async function* subAsync() {
+      yield* c();
+      yield* d();
+    }
+
+    async function* main() {
+      yield* a();
+      yield* subSync();
+      yield* subAsync();
+    }
+    type ExpectedMainEffect =
+      | EffectFor<typeof a>
+      | EffectFor<typeof b>
+      | EffectFor<typeof c>
+      | EffectFor<typeof d>;
+    type ExpectedSubEffect = EffectFor<typeof b | typeof c>;
+    type ExpectedAsyncSubEffect = EffectFor<typeof c | typeof d>;
+    const mg: AsyncGenerator<ExpectedMainEffect> = performAsync(main(), {
+      [a.t]: () => {},
+      [b.t]: () => {},
+      [c.t]: () => {},
+      [d.t]: () => {},
+    });
+    const sg: Generator<ExpectedSubEffect> = performSync(subSync(), {
+      [b.t]: () => {},
+      [c.t]: () => {},
+    });
+    const asg: AsyncGenerator<ExpectedAsyncSubEffect> = performAsync(
+      subAsync(),
+      {
+        [c.t]: () => {},
+        [d.t]: () => {},
+      }
+    );
+
+    expect(await Array.fromAsync(mg)).toEqual([
+      a.of([], undefined),
+      b.of([], undefined),
+      c.of([], undefined),
+      c.of([], undefined),
+      d.of([], undefined),
+    ]);
+    expect(Array.from(sg)).toEqual([b.of([], undefined), c.of([], undefined)]);
+    expect(await Array.fromAsync(asg)).toEqual([
+      c.of([], undefined),
+      d.of([], undefined),
+    ]);
+
+    // const _0: AsyncGenerator<EffectFor<typeof a | typeof b | typeof c>> = main();
+  });
 });
 
 Deno.test("perform(async)", async (t) => {
@@ -70,7 +130,7 @@ Deno.test("perform(async)", async (t) => {
     const expected: MyProgramEffect[] = [none.of([], undefined)];
     expect(result).toEqual(expected);
   });
-  await t.step("performAsync: sub", async () => {
+  await t.step("with subprogram", async () => {
     const v = defineEffect<"v", [v: number], undefined>("v");
     type ValueEffect = EffectFor<typeof v>;
     const sub = function* (): Generator<ValueEffect> {
@@ -101,12 +161,14 @@ Deno.test("perform(async)", async (t) => {
 
 Deno.test("types", async (t) => {
   const TYPECHECK_ONLY: boolean = false;
+  const none = defineEffect<"none">("none");
+  const double = defineEffect<"double", [number], number>("double");
+  const undef = defineEffect<"undef">("undef");
 
-  await t.step("sync types", () => {
+  type MyProgramEffect = EffectFor<typeof double> | EffectFor<typeof none>;
+
+  await t.step("Generator allows only Generator (not AsyncGenerator)", () => {
     if (TYPECHECK_ONLY) {
-      const none = defineEffect<"none">("none");
-      const double = defineEffect<"double", [number], number>("double");
-      type MyProgramEffect = EffectFor<typeof double> | EffectFor<typeof none>;
       function* _(): Generator<MyProgramEffect> {
         const _1: void = yield* none();
         // @ts-expect-error can not return without yield*
@@ -123,11 +185,8 @@ Deno.test("types", async (t) => {
       }
     }
   });
+  await t.step("performSync allows only sync Handlers", () => {});
   if (TYPECHECK_ONLY) {
-    const none = defineEffect<"none">("none");
-    const double = defineEffect<"double", [x: number], number>("double");
-    type MyProgramEffect = EffectFor<typeof double> | EffectFor<typeof none>;
-
     function* sync(): Generator<EffectFor<typeof double>, boolean> {
       const _: number = yield* double(2);
       // @ts-expect-error can not yield
@@ -155,9 +214,6 @@ Deno.test("types", async (t) => {
   }
   await t.step("SyncHandlersFor", async () => {
     if (TYPECHECK_ONLY) {
-      const none = defineEffect<"none">("none");
-      const undef = defineEffect<"undef">("undef");
-
       const double = defineEffect<"double", [number], number>("double");
       type MyProgramEffect =
         | EffectFor<typeof double>
