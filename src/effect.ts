@@ -290,7 +290,7 @@ export async function* performAsync<E extends Effect<string, AnyArgs, any>, R>(
   }
 }
 
-export const perform = performSync;
+export const perform = performAsync;
 
 /**
  * No-op function that returns undefined.
@@ -438,7 +438,7 @@ export async function* extend<
     const handlerResult = await handler(...effect.args);
     result = await g.next(handlerResult);
     yield {
-      t: `${exKey}:${effect.t}`,
+      t: `${exKey}/${effect.t}`,
       args: effect.args,
       return: handlerResult,
       extended: true,

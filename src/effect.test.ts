@@ -11,6 +11,8 @@ import {
   Effect,
   extendSync,
   type ExtendEffect,
+  extend,
+  perform,
 } from "./effect.ts";
 import { expect } from "@std/expect";
 import { unreachable } from "./unreachable.ts";
@@ -115,7 +117,7 @@ Deno.test("performSync", async (t) => {
       d.of([], undefined),
     ]);
   });
-  await t.step("with extensible effects", () => {
+  await t.step("sync with extensible effects", () => {
     const x = defineEffect<"x">("x");
     const y = defineEffect<"y", [], string>("y");
     const z = defineEffect<"z", [], number>("z");
@@ -144,6 +146,48 @@ Deno.test("performSync", async (t) => {
 
     const result: MyProgramEffect[] = Array.from(
       performSync(myProgram(), {
+        [x.t]: () => {},
+        [y.t]: () => "y",
+      })
+    );
+    const expected: MyProgramEffect[] = [
+      x.of([], undefined),
+      y.of([], "y"),
+      y.extendedOf("ex", [], "ex:y"),
+      z.extendedOf("ex", [], 4),
+    ];
+    expect(result).toEqual(expected);
+  });
+
+  await t.step("async with extensible effects", async () => {
+    const x = defineEffect<"x">("x");
+    const y = defineEffect<"y", [], string>("y");
+    const z = defineEffect<"z", [], number>("z");
+
+    type ExtendedEffect = EffectFor<typeof y> | EffectFor<typeof z>;
+
+    type MyProgramEffect =
+      | EffectFor<typeof x>
+      | EffectFor<typeof y>
+      | ExtendEffect<"ex", ExtendedEffect>;
+
+    const extended = async function* (): AsyncGenerator<ExtendedEffect> {
+      yield* y(); // "ex:y"
+      yield* z(); // 4
+      return true;
+    };
+
+    const myProgram = async function* (): AsyncGenerator<MyProgramEffect> {
+      yield* x(); // 1
+      yield* y(); // "y"
+      const _: boolean = yield* extend("ex", extended(), {
+        [y.t]: () => "ex:y",
+        [z.t]: () => 4,
+      });
+    };
+
+    const result: MyProgramEffect[] = await Array.fromAsync(
+      perform(myProgram(), {
         [x.t]: () => {},
         [y.t]: () => "y",
       })
