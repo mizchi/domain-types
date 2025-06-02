@@ -13,6 +13,7 @@ export type Effect<K extends string, A extends AnyArgs, R> = {
   t: K;
   args: A;
   return: R;
+  extended?: boolean;
 };
 
 /**
@@ -21,7 +22,11 @@ export type Effect<K extends string, A extends AnyArgs, R> = {
  * @returns Object type mapping effect keys to their async handler functions
  */
 export type HandlersFor<E extends Effect<string, AnyArgs, any>> = {
-  [K in E["t"]]: E extends Effect<K, infer A, infer R>
+  [K in E["t"] as E extends Effect<K, any, any>
+    ? E extends { extended: true }
+      ? never
+      : K
+    : never]: E extends Effect<K, infer A, infer R>
     ? (...args: A) => R | Promise<R>
     : never;
 };
@@ -41,7 +46,11 @@ type ExplicitSync<F> = F extends (...args: any[]) => any
  * @returns Object type mapping effect keys to their sync handler functions
  */
 export type SyncHandlersFor<E extends Effect<string, AnyArgs, any>> = {
-  [K in E["t"]]: E extends Effect<K, infer A, Awaited<infer R>>
+  [K in E["t"] as E extends Effect<K, any, any>
+    ? E extends { extended: true }
+      ? never
+      : K
+    : never]: E extends Effect<K, infer A, Awaited<infer R>>
     ? ExplicitSync<(...args: A) => R>
     : never;
 };
@@ -149,6 +158,12 @@ export function* performSync<E extends Effect<string, AnyArgs, any>, R>(
   let result: IteratorResult<E, R> = g.next();
   while (!result.done) {
     const effect = result.value;
+    // Skip extended effects - they should be handled by their own extend call
+    if (effect.extended) {
+      result = g.next((effect as any).return);
+      yield effect;
+      continue;
+    }
     const handler = (handlers as any)[effect.t];
     if (!handler) {
       throw new EffectMissingError(effect.t);
@@ -205,7 +220,18 @@ export async function* performAsync<E extends Effect<string, AnyArgs, any>, R>(
     return;
   }
   while (!result.done) {
+    // @ts-ignore unknown type for generator.next
     const effect = result.value;
+    // Skip extended effects - they should be handled by their own extend call
+    if (effect.extended) {
+      try {
+        result = await generator.next((effect as any).return);
+        yield effect;
+      } catch (error) {
+        throw new EffectYieldError(error);
+      }
+      continue;
+    }
     const handler = (handlers as any)[effect.t];
     if (!handler) {
       throw new EffectMissingError(effect.t);
@@ -313,5 +339,49 @@ export class EffectMissingError extends Error {
    */
   constructor(public readonly key: string | undefined) {
     super(`${EffectHandlerError}: Missing handler for ${key}`);
+  }
+}
+
+/**
+ * Extends an effect with a new key.
+ * @example
+ * const extended = extend("ex", effect, {
+ *   [effect.t]: () => "extended",
+ * });
+ * // extended is Effect<"ex:originalKey", Args, Return>
+ */
+export type ExtendEffect<
+  ExKey extends string,
+  E extends Effect<string, AnyArgs, any>
+> = E extends Effect<infer K, infer A, infer R>
+  ? Effect<`${ExKey}:${K}`, A, R> & { extended: true }
+  : never;
+
+/**
+ * extend generator with new effects and handlers.
+ */
+export function* extend<
+  Ex extends string,
+  E extends Effect<string, AnyArgs, any>
+>(
+  exKey: Ex,
+  g: Generator<E>,
+  h: HandlersFor<E>
+): Generator<ExtendEffect<Ex, E>> {
+  let result = g.next();
+  while (!result.done) {
+    const effect = result.value;
+    const handler = (h as any)[effect.t];
+    if (!handler) {
+      throw new EffectMissingError(effect.t);
+    }
+    const handlerResult = handler(...effect.args);
+    result = g.next(handlerResult);
+    yield {
+      t: `${exKey}:${effect.t}`,
+      args: effect.args,
+      return: handlerResult,
+      extended: true,
+    } as ExtendEffect<Ex, E>;
   }
 }

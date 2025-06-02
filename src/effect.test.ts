@@ -9,6 +9,8 @@ import {
   EffectMissingError,
   EffectHandlerError,
   Effect,
+  extend,
+  type ExtendEffect,
 } from "./effect.ts";
 import { expect } from "@std/expect";
 import { unreachable } from "./unreachable.ts";
@@ -117,28 +119,6 @@ Deno.test("performSync", async (t) => {
     // const _0: AsyncGenerator<EffectFor<typeof a | typeof b | typeof c>> = main();
   });
   await t.step("with extensible effects", () => {
-    // impl wip
-    const extend = function <
-      Ex extends string,
-      G extends Generator<Effect<any, any, any>>,
-      H extends any
-    >(
-      exKey: Ex,
-      g: G,
-      h: H
-    ): G extends Generator<Effect<infer K, infer A, infer R>>
-      ? Generator<Effect<`${Ex}:${K}`, A, R>>
-      : never {
-      throw new Error("Not implemented");
-    };
-
-    type ExtendEffect<
-      ExKey extends string,
-      E extends Effect<string, any[], any>
-    > = E extends Effect<infer K, infer A, infer R>
-      ? Effect<`${ExKey}:${K}`, A, R> & { readonly __extended?: true }
-      : never;
-
     // test
     const x = defineEffect<"x">("x");
     const y = defineEffect<"y", [], string>("y");
@@ -158,15 +138,11 @@ Deno.test("performSync", async (t) => {
 
     const myProgram = function* (): Generator<MyProgramEffect> {
       yield* x(); // 1
-      // yield* y(); // 2
-      const exg: Generator<ExtendEffect<"ex", ExtendedEffect>> = extend(
-        "ex",
-        extended(),
-        {
-          [y.t]: () => "unreachable: ex:y",
-          [z.t]: () => 4,
-        }
-      );
+      yield* y(); // "y"
+      const exg = extend("ex", extended(), {
+        [y.t]: () => "ex:y",
+        [z.t]: () => 4,
+      });
 
       yield* exg;
     };
@@ -175,9 +151,6 @@ Deno.test("performSync", async (t) => {
       performSync(myProgram(), {
         [x.t]: () => {},
         [y.t]: () => "y",
-        // TODO: Omit extended effects later
-        "ex:y": () => "unreachable: ex:y", // override y in extended
-        "ex:z": () => 4, // override z in extended
       })
     );
     const expected: MyProgramEffect[] = [
@@ -187,11 +160,13 @@ Deno.test("performSync", async (t) => {
         t: "ex:y",
         args: [],
         return: "ex:y",
+        extended: true,
       },
       {
         t: "ex:z",
         args: [],
         return: 4,
+        extended: true,
       },
     ];
     expect(result).toEqual(expected);
