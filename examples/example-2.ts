@@ -79,7 +79,7 @@ function* program(): Generator<ProgramEffect, number> {
 }
 {
   // async
-  const none = defineEffect<"none", [], undefined>("none");
+  const none = defineEffect<"double", [], undefined>("double");
   const lazy1 = defineEffect<"lazy1", [input: number], number>("lazy1");
   const lazy2 = defineEffect<"lazy2", [], string>("lazy2");
   type MyProgramEffect =

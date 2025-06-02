@@ -2,7 +2,6 @@ import {
   type AsyncHandlersFor,
   type EffectFor,
   type HandlersFor,
-  type ResultStep,
   defineEffect,
   performAsync,
   perform,
@@ -21,9 +20,7 @@ Deno.test("perform: minimum", async () => {
   const handlers: HandlersFor<MyProgramEffect> = {
     [none.t]: () => {},
   };
-  const xs: ResultStep<MyProgramEffect>[] = Array.from(
-    perform(myProgram(), handlers)
-  );
+  const xs: MyProgramEffect[] = Array.from(perform(myProgram(), handlers));
   expect(xs).toEqual([["none", [], undefined]]);
 });
 
@@ -37,7 +34,7 @@ Deno.test("performAsync: minimum", async () => {
     [none.t]: async () => {},
   };
   const result = await Array.fromAsync(performAsync(myProgram(), handlers));
-  const expected: ResultStep<MyProgramEffect>[] = [["none", [], undefined]];
+  const expected: MyProgramEffect[] = [["none", [], undefined]];
   expect(result).toEqual(expected);
 });
 
@@ -59,12 +56,10 @@ Deno.test("perform: sub", async () => {
   const handlers: HandlersFor<MyProgramEffect> = {
     [v.t]: () => {},
   };
-  const result: ResultStep<MyProgramEffect>[] = Array.from(
-    perform(myProgram(), handlers)
-  );
-  const expected: ResultStep<MyProgramEffect>[] = [
-    ["v", [1], undefined],
-    ["v", [2], undefined],
+  const result: MyProgramEffect[] = Array.from(perform(myProgram(), handlers));
+  const expected: MyProgramEffect[] = [
+    v.of([1], undefined),
+    v.of([2], undefined),
   ];
   expect(result).toEqual(expected);
 });
@@ -87,13 +82,10 @@ Deno.test("performAsync: sub", async () => {
   const handlers: HandlersFor<ValueEffect> = {
     [v.t]: () => {},
   };
-  const result: ResultStep<ValueEffect>[] = await Array.fromAsync(
+  const result: ValueEffect[] = await Array.fromAsync(
     performAsync(myProgram(), handlers)
   );
-  const expected: ResultStep<ValueEffect>[] = [
-    ["v", [1], undefined],
-    ["v", [2], undefined],
-  ];
+  const expected: ValueEffect[] = [v.of([1], undefined), v.of([2], undefined)];
   expect(result).toEqual(expected);
 });
 
@@ -101,7 +93,7 @@ const TYPECHECK_ONLY: boolean = false;
 Deno.test("types", async () => {
   if (TYPECHECK_ONLY) {
     const none = defineEffect<"none">("none");
-    const double = defineEffect<"none", [number], number>("none");
+    const double = defineEffect<"double", [number], number>("double");
     type MyProgramEffect = EffectFor<typeof double> | EffectFor<typeof none>;
     function* _(): Generator<MyProgramEffect> {
       const _1: void = yield* none();
@@ -204,7 +196,7 @@ Deno.test("with EffectError(init)", async () => {
     unreachable("should not reach here");
   } catch (e) {
     assertErrorInstance(e, EffectError);
-    expect(e.key).toBe(undefined);
+    expect(e.t).toBe(undefined);
     expect(e.step).toBe("init");
     assertErrorInstance(e.cause, TypeError);
   }
