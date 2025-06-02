@@ -1,7 +1,6 @@
 import {
   type EffectFor,
-  type AsyncHandlersFor,
-  type ResultStep,
+  type HandlersFor,
   defineEffect,
   performAsync,
 } from "@mizchi/domain-types";
@@ -28,7 +27,7 @@ async function* program(): AsyncGenerator<ProgramEffect> {
 }
 
 // run with handlers
-const handlers: AsyncHandlersFor<ProgramEffect> = {
+const handlers: HandlersFor<ProgramEffect> = {
   [log.t]: async (message) => {
     console.log(`[log] ${message}`);
   },
@@ -41,10 +40,10 @@ const handlers: AsyncHandlersFor<ProgramEffect> = {
 };
 
 // Execute the program
-const steps: ResultStep<ProgramEffect>[] = await Array.fromAsync(
+const effects: ProgramEffect[] = await Array.fromAsync(
   performAsync(program(), handlers)
 );
-console.log("Program steps:", steps);
+console.log("Program steps:", effects);
 /** * Output:
 [log] start
 [log] sub

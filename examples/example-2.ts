@@ -1,11 +1,10 @@
 import {
-  AsyncHandlersFor,
+  type HandlersFor,
+  type EffectFor,
+  type SyncHandlersFor,
   defineEffect,
-  EffectFor,
-  HandlersFor,
-  perform,
   performAsync,
-  ResultStep,
+  performSync,
 } from "@mizchi/domain-types";
 
 const print = defineEffect<"log", [input: string], void>("log");
@@ -41,7 +40,7 @@ function* program(): Generator<ProgramEffect, number> {
 
 {
   // sync
-  const syncHandlers: HandlersFor<ProgramEffect> = {
+  const syncHandlers: SyncHandlersFor<ProgramEffect> = {
     [print.t](payload) {
       console.log(`print ${payload}`);
     },
@@ -54,13 +53,13 @@ function* program(): Generator<ProgramEffect, number> {
       return { ok: true, value: 42 };
     },
   };
-  for (const [key, args, result] of perform(program(), syncHandlers)) {
-    console.log(`Step:`, key, args, result);
+  for (const g of performSync(program(), syncHandlers)) {
+    console.log(`Step:`, g);
   }
 }
 {
   // async
-  const handlers: AsyncHandlersFor<ProgramEffect> = {
+  const handlers: HandlersFor<ProgramEffect> = {
     [print.t](payload) {
       console.log(`print ${payload}`);
     },
@@ -73,13 +72,13 @@ function* program(): Generator<ProgramEffect, number> {
       return { ok: true, value: 42 };
     },
   };
-  for await (const [key, args, result] of performAsync(program(), handlers)) {
-    console.log(`Async Step`, key, args, result);
+  for await (const e of performAsync(program(), handlers)) {
+    console.log(`Async Step`, e);
   }
 }
 {
   // async
-  const none = defineEffect<"double", [], undefined>("double");
+  const none = defineEffect<"none", [], undefined>("none");
   const lazy1 = defineEffect<"lazy1", [input: number], number>("lazy1");
   const lazy2 = defineEffect<"lazy2", [], string>("lazy2");
   type MyProgramEffect =
@@ -91,8 +90,8 @@ function* program(): Generator<ProgramEffect, number> {
     const _2: string = yield* lazy2();
     const _3: void = yield* none();
   };
-  type MergedEffectResult = ResultStep<MyProgramEffect>;
-  const h: AsyncHandlersFor<MyProgramEffect> = {
+  type MergedEffectResult = MyProgramEffect;
+  const h: HandlersFor<MyProgramEffect> = {
     [lazy1.t]: async (input: number) => input * 2,
     [lazy2.t]: () => "lazyValue",
     [none.t]: async () => {
@@ -100,10 +99,7 @@ function* program(): Generator<ProgramEffect, number> {
     },
   };
 
-  const steps1: AsyncGenerator<ResultStep<MyProgramEffect>> = performAsync(
-    myProgram(),
-    h
-  );
+  const steps1: AsyncGenerator<MyProgramEffect> = performAsync(myProgram(), h);
   const result: MergedEffectResult[] = await Array.fromAsync(steps1);
   console.log("Collected steps:", result);
 }

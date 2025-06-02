@@ -4,15 +4,6 @@
 type AnyArgs = Array<any>;
 
 /**
- * @internal
- */
-type ExplicitSync<F> = F extends (...args: any[]) => any
-  ? F extends (...args: any[]) => Promise<any>
-    ? never
-    : F
-  : never;
-
-/**
  * Represents an effect with a key, arguments, and expected return type.
  * @template K - The effect key/identifier
  * @template A - The arguments tuple type
@@ -29,18 +20,27 @@ export type Effect<K extends string, A extends AnyArgs, R> = {
  * @template E - Union of effect types
  * @returns Object type mapping effect keys to their async handler functions
  */
-export type AsyncHandlersFor<E extends Effect<string, AnyArgs, any>> = {
+export type HandlersFor<E extends Effect<string, AnyArgs, any>> = {
   [K in E["t"]]: E extends Effect<K, infer A, infer R>
     ? (...args: A) => R | Promise<R>
     : never;
 };
 
 /**
+ * @internal
+ */
+type ExplicitSync<F> = F extends (...args: any[]) => any
+  ? F extends (...args: any[]) => Promise<any>
+    ? never
+    : F
+  : never;
+
+/**
  * Creates a synchronous handler map type for a given effect union.
  * @template E - Union of effect types
  * @returns Object type mapping effect keys to their sync handler functions
  */
-export type HandlersFor<E extends Effect<string, AnyArgs, any>> = {
+export type SyncHandlersFor<E extends Effect<string, AnyArgs, any>> = {
   [K in E["t"]]: E extends Effect<K, infer A, Awaited<infer R>>
     ? ExplicitSync<(...args: A) => R>
     : never;
@@ -50,10 +50,13 @@ export type HandlersFor<E extends Effect<string, AnyArgs, any>> = {
  * @template Builder - The EffectBuilder type
  * @returns The corresponding Effect type
  */
-export type EffectFor<Builder extends EffectBuilder<string, AnyArgs, any>> =
-  Builder extends EffectBuilder<infer K, infer A, infer F>
-    ? Effect<K, A, F>
-    : never;
+export type EffectFor<Builder> = Builder extends EffectBuilder<
+  infer K,
+  infer A,
+  infer F
+>
+  ? Effect<K, A, F>
+  : never;
 
 /**
  * Builder type for creating effects with type-safe APIs.
@@ -139,9 +142,9 @@ export function effectFrom<K extends string, F extends (...args: any[]) => any>(
  * }
  * [...perform(program(), { log: console.log })]
  */
-export function* perform<E extends Effect<string, AnyArgs, any>, R>(
+export function* performSync<E extends Effect<string, AnyArgs, any>, R>(
   g: Generator<E, R, any>,
-  handlers: HandlersFor<E>
+  handlers: SyncHandlersFor<E>
 ): Generator<E> {
   let result: IteratorResult<E, R> = g.next();
   while (!result.done) {
@@ -151,7 +154,6 @@ export function* perform<E extends Effect<string, AnyArgs, any>, R>(
       throw new EffectMissingError(effect.t);
     }
     try {
-      // @ts-ignore
       const handlerResult = handler(...effect.args);
       result = g.next(handlerResult);
       yield {
@@ -160,11 +162,13 @@ export function* perform<E extends Effect<string, AnyArgs, any>, R>(
         return: handlerResult,
       } as E;
     } catch (error) {
-      throw new EffectError(
+      throw new EffectHandlerError(
         error instanceof Error ? error : new Error(String(error)),
-        "handler",
-        effect.t,
-        effect.args
+        {
+          t: effect.t,
+          args: effect.args,
+          return: undefined as any,
+        }
       );
     }
   }
@@ -184,22 +188,18 @@ export function* perform<E extends Effect<string, AnyArgs, any>, R>(
  *   console.log(step); // { t: 'val', args: [42], return: 43 }
  * }
  * @throws {EffectMissingError} When a handler for an effect is not found
- * @throws {EffectError} When a handler throws an error or generator fails
+ * @throws {EffectYieldError} When a handler throws an error or generator fails
+ * @throws {EffectHandlerError} When a handler throws an error
  */
 export async function* performAsync<E extends Effect<string, AnyArgs, any>, R>(
   generator: AsyncGenerator<E, R, any> | Generator<E, R, any>,
-  handlers: AsyncHandlersFor<E>
+  handlers: HandlersFor<E>
 ): AsyncGenerator<E> {
   let result: IteratorResult<E, R>;
   try {
     result = await generator.next();
   } catch (error) {
-    throw new EffectError(
-      error instanceof Error ? error : new Error(String(error)),
-      "init",
-      undefined,
-      []
-    );
+    throw new EffectYieldError(error);
   }
   if (result.done) {
     return;
@@ -214,11 +214,13 @@ export async function* performAsync<E extends Effect<string, AnyArgs, any>, R>(
     try {
       handlerReturn = await handler(...effect.args);
     } catch (error) {
-      throw new EffectError(
+      throw new EffectHandlerError(
         error instanceof Error ? error : new Error(String(error)),
-        "handler",
-        effect.t,
-        effect.args
+        {
+          t: effect.t,
+          args: effect.args,
+          return: undefined as any,
+        }
       );
     }
     try {
@@ -229,15 +231,12 @@ export async function* performAsync<E extends Effect<string, AnyArgs, any>, R>(
         return: handlerReturn,
       } as E;
     } catch (error) {
-      throw new EffectError(
-        error instanceof Error ? error : new Error(String(error)),
-        "generator",
-        effect.t,
-        effect.args
-      );
+      throw new EffectYieldError(error);
     }
   }
 }
+
+export const perform = performSync;
 
 /**
  * No-op function that returns undefined.
@@ -248,22 +247,13 @@ export async function* performAsync<E extends Effect<string, AnyArgs, any>, R>(
  *   analytics: isProduction ? sendAnalytics : none
  * };
  */
-export const none = () => {};
+export const nope = () => {};
 
 /**
  * Creates a function that returns a constant value.
  * @example
  * const handlers = {
- *   getEnv: returns({ apiUrl: 'https://api.example.com' }),
- *   getCurrentUser: returns({ id: 1, name: 'Test User' }),
- *   isFeatureEnabled: returns(true)
- * };
- *
- * // Useful for testing
- * const testHandlers = {
  *   fetchUser: returns({ id: 1, name: 'Mock User' }),
- *   saveData: returns(undefined),
- *   generateId: returns('test-id-123')
  * };
  */
 export const returns =
@@ -271,39 +261,28 @@ export const returns =
   () =>
     v;
 
-const EFFECT_ERROR_MESSAGE = "EffectError";
-
-/**
- * Error thrown when an effect execution fails.
- * Contains information about which step failed and the effect context.
- * @example
- * try {
- *   await performAsync(program(), handlers);
- * } catch (error) {
- *   if (error instanceof EffectError) {
- *     console.error(`Failed at ${error.step} args ${error.args} returned ${error.return}`);
- *   }
- * }
- */
-export class EffectError extends Error {
+export class EffectYieldError extends Error {
   /**
-   * @param originalError - The original error that caused the failure
-   * @param step - The step where the error occurred (handler, init, or generator)
-   * @param t - The effect key that was being executed
-   * @param args - The arguments passed to the effect
+   * @param internalError - The original error that caused the failure
+   */
+  constructor(internalError: Error | any) {
+    super(`${EffectYieldError.name}`, {
+      cause: internalError,
+    });
+  }
+}
+
+export class EffectHandlerError extends Error {
+  /**
+   * @param internalError - The original error that caused the failure
+   * @param effect
    */
   constructor(
-    originalError: Error | string,
-    public step: "handler" | "init" | "generator",
-    public readonly t: string | undefined,
-    public readonly args: AnyArgs
+    internalError: Error | any,
+    public effect: Effect<string, AnyArgs, undefined>
   ) {
-    const message = ["handler", "missingHandler"].includes(step)
-      ? `${step}:${t}`
-      : step;
-    // @ts-ignore node can not handle Error cause yet
-    super(`${EFFECT_ERROR_MESSAGE}: ${message}`, {
-      cause: originalError,
+    super(`${EffectHandlerError.name}`, {
+      cause: internalError,
     });
   }
 }
@@ -333,6 +312,6 @@ export class EffectMissingError extends Error {
    * @param key - The effect key that has no handler
    */
   constructor(public readonly key: string | undefined) {
-    super(`EffectMissingError: Missing handler for effect: ${key}`);
+    super(`${EffectHandlerError}: Missing handler for ${key}`);
   }
 }

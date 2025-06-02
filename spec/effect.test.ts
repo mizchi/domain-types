@@ -1,9 +1,8 @@
 import {
   defineEffect,
   type EffectFor,
-  type AsyncHandlersFor,
+  type HandlersFor,
   performAsync,
-  type ResultStep,
 } from "../src/mod.ts";
 import { expect } from "@std/expect";
 
@@ -53,7 +52,7 @@ Deno.test("Effect Example", async () => {
   // Effect型の定義（プログラムで使用される全てのエフェクト）
 
   // 型推論可能なハンドラーの作成
-  const handlers: AsyncHandlersFor<ProgramEffect> = {
+  const handlers: HandlersFor<ProgramEffect> = {
     async [print.t](message) {
       return undefined;
     },
@@ -89,10 +88,9 @@ Deno.test("Effect Example", async () => {
   };
 
   const xs = await Array.fromAsync(performAsync(program(), handlers));
-  const expected: ResultStep<ProgramEffect>[] = [
-    ["log", ["Starting complex workflow..."], undefined],
-    [
-      "fsRead",
+  const expected: ProgramEffect[] = [
+    print.of(["Starting complex workflow..."], undefined),
+    readFile.of(
       ["config.json"],
       JSON.stringify(
         {
@@ -103,9 +101,8 @@ Deno.test("Effect Example", async () => {
         null,
         2
       ),
-    ],
-    [
-      "log",
+    ),
+    print.of(
       [
         `Config loaded: ${JSON.stringify(
           {
@@ -118,20 +115,19 @@ Deno.test("Effect Example", async () => {
         )}`,
       ],
       undefined,
-    ],
-    [
-      "database",
-      ["SELECT * FROM users"],
+    ),
+    dbQuery.of(
+      ["SELECT * FROM users", undefined],
       [
         { id: 1, name: "Alice" },
         { id: 2, name: "Bob" },
         { id: 3, name: "Charlie" },
       ],
-    ],
-    ["log", ["Found 3 users"], undefined],
-    ["timer", [100], undefined],
-    ["fsWrite", ["report.txt", "Report: 3 users processed"], undefined],
-    ["timer", [100], undefined],
+    ),
+    print.of(["Found 3 users"], undefined),
+    delay.of([100], undefined),
+    writeFile.of(["report.txt", "Report: 3 users processed"], undefined),
+    delay.of([100], undefined),
   ];
 
   expect(xs).toEqual(expected);

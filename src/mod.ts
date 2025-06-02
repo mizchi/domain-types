@@ -1,18 +1,19 @@
 export {
-  type AsyncHandlersFor,
+  type SyncHandlersFor,
   type Effect,
   type EffectBuilder,
   type EffectFor,
   type HandlersFor,
-  type ResultStep,
   defineEffect,
   effectFrom,
   performAsync,
+  performSync,
   perform,
-  none,
+  nope,
   returns,
-  EffectError,
+  EffectHandlerError,
   EffectMissingError,
+  EffectYieldError,
 } from "./effect.ts";
 
 export { unreachable, UnreachableError } from "./unreachable.ts";

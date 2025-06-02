@@ -1,11 +1,11 @@
 import {
   type EffectFor,
-  type AsyncHandlersFor,
   type HandlersFor,
+  type SyncHandlersFor,
   defineEffect,
   performAsync,
   effectFrom,
-  perform,
+  performSync,
 } from "@mizchi/domain-types";
 import path from "node:path";
 
@@ -63,7 +63,7 @@ function* program(): Generator<DenoProgramEffect, void> {
 
 // Handlers
 {
-  const handlers: AsyncHandlersFor<DenoProgramEffect> = {
+  const handlers: HandlersFor<DenoProgramEffect> = {
     [cwd.t]: Deno.cwd,
     [readTextFile.t]: Deno.readTextFile,
     [writeTextFile.t]: Deno.writeTextFile,
@@ -95,7 +95,7 @@ function* program(): Generator<DenoProgramEffect, void> {
 {
   // Mocked
   console.log("=== Running Mocked Deno Program ===");
-  const handlers: HandlersFor<DenoProgramEffect> = {
+  const handlers: SyncHandlersFor<DenoProgramEffect> = {
     [cwd.t]: Deno.cwd,
     [readTextFile.t]: () => {
       return "Mocked file content";
@@ -119,6 +119,6 @@ function* program(): Generator<DenoProgramEffect, void> {
       console.log(`[log] ${message}`);
     },
   };
-  const steps = perform(program(), handlers);
+  const steps = performSync(program(), handlers);
   console.log("Program steps:", Array.from(steps));
 }
