@@ -320,6 +320,7 @@ export class EffectYieldError extends Error {
    * @param internalError - The original error that caused the failure
    */
   constructor(internalError: Error | any) {
+    // @ts-ignore node can not handle Error with cause
     super(`${EffectYieldError.name}`, {
       cause: internalError,
     });
@@ -335,6 +336,7 @@ export class EffectHandlerError extends Error {
     internalError: Error | any,
     public effect: Effect<string, AnyArgs, undefined>
   ) {
+    // @ts-ignore node can not handle Error with cause
     super(`${EffectHandlerError.name}`, {
       cause: internalError,
     });
@@ -366,6 +368,7 @@ export class EffectMissingError extends Error {
    * @param key - The effect key that has no handler
    */
   constructor(public readonly key: string | undefined) {
+    // @ts-ignore node can not handle Error with cause
     super(`${EffectHandlerError}: Missing handler for ${key}`);
   }
 }
